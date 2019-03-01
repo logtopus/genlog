@@ -1,0 +1,12 @@
+[package]
+name = "genlog"
+version = "0.1.0"
+authors = ["niveau0 <plingplong@t-online.de>", "kodemaniak <carsten@kodemaniak.de>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.32" 
+log = "0.4"
+env_logger = "0.6"
+rand = "0.6"
+chrono = "0.4"
