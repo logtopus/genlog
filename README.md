@@ -1,0 +1,2 @@
+# genlog
+Test log generator
