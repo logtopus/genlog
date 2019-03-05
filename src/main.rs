@@ -1,5 +1,5 @@
-#[macro_use]
-extern crate log;
+// #[macro_use]
+// extern crate log;
 
 use clap::{App, Arg, ArgMatches};
 use std::fs::File;
@@ -39,15 +39,15 @@ fn gen_log(cli_matches: &ArgMatches) {
 
     let mut count = rotations;
     while count >= 0 {
-        let mut file = if count == 0 {
-            File::create(path.join("testlog.log"))
+        let path = if count == 0 {
+            path.join("testlog.log")
         } else {
-            File::create(path.join(format!("testlog.log.{}", count)))
-        }
-        .unwrap();
+            path.join(format!("testlog.log.{}", count))
+        };
 
-        debug!("Creating file {:?}", &file);
+        println!("Creating file {:?}", path.to_str().unwrap());
 
+        let mut file = File::create(path).unwrap();
         for i in 0..lines {
             let msg_idx = rand::random::<usize>() % msgtpl.len();
 
