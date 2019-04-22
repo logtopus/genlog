@@ -17,14 +17,55 @@ fn main() {
 
 fn gen_log(cli_matches: &ArgMatches) {
     let lines = cli_matches
-        .value_of("l")
+        .value_of("lines")
         .map(|s| s.parse().unwrap())
         .unwrap_or(100);
     let rotations = cli_matches
-        .value_of("r")
+        .value_of("rotations")
         .map(|s| s.parse().unwrap())
         .unwrap_or(0);
-    let path = Path::new(cli_matches.value_of("o").unwrap());
+    let path = Path::new(cli_matches.value_of("output").unwrap());
+
+    let now = chrono::Utc::now();
+
+    let end = cli_matches
+        .value_of("timerange-end")
+        .map(|s| {
+            chrono::DateTime::from_utc(
+                chrono::NaiveDateTime::from_timestamp(
+                    s.parse::<i64>().expect("End requires seconds as argument"),
+                    0,
+                ),
+                chrono::Utc,
+            )
+        })
+        .unwrap_or(now);
+
+    let begin = cli_matches
+        .value_of("timerange-begin")
+        .map(|s| {
+            chrono::DateTime::from_utc(
+                chrono::NaiveDateTime::from_timestamp(
+                    s.parse::<i64>()
+                        .expect("Begin requires seconds as argument"),
+                    0,
+                ),
+                chrono::Utc,
+            )
+        })
+        .unwrap_or(end - chrono::Duration::days(10));
+
+    if begin > end {
+        panic!("Begin cannot be after end.")
+    }
+
+    let maxgap = cli_matches
+        .value_of("maximum-gap")
+        .map(|s| {
+            s.parse::<u64>()
+                .expect("Maximum gap must be a positive value in milliseconds")
+        })
+        .unwrap_or(1000 * 60 * 5);
 
     let msgtpl: Vec<&str> = vec![
         "{dt} TRACE This is a trace message. Its line number {count}\n",
@@ -34,9 +75,7 @@ fn gen_log(cli_matches: &ArgMatches) {
         "{dt} ERROR This is an error message. Its line number {count}\n",
     ];
 
-    let now = chrono::Utc::now();
-    let mut ts = now - chrono::Duration::days(10);
-
+    let mut ts = begin;
     let mut count = rotations;
     while count >= 0 {
         let path = if count == 0 {
@@ -56,8 +95,11 @@ fn gen_log(cli_matches: &ArgMatches) {
             let line = line.replace("{count}", &(count * lines + i).to_string());
             file.write_all(line.as_bytes()).unwrap();
 
-            let time_add = rand::random::<u64>() % 10000;
+            let time_add = rand::random::<u64>() % maxgap;
             ts = ts + chrono::Duration::milliseconds(time_add as i64);
+            if ts > end {
+                break;
+            }
         }
         count -= 1;
     }
@@ -69,7 +111,7 @@ fn parse_cli() -> clap::ArgMatches<'static> {
         .author(AUTHORS)
         .about("Provide logfiles for testing purposes")
         .arg(
-            Arg::with_name("o")
+            Arg::with_name("output")
                 .required(true)
                 .short("o")
                 .long("outpath")
@@ -78,19 +120,43 @@ fn parse_cli() -> clap::ArgMatches<'static> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("l")
+            Arg::with_name("lines")
                 .short("l")
                 .long("lines")
                 .value_name("LINES")
-                .help("Set number of log file lines to generate, defaults to 100")
+                .help("Set maximum number of log file lines to generate per rotation, defaults to 100. Truncated if end time stamp is reached")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("r")
+            Arg::with_name("rotations")
                 .short("r")
                 .long("rotations")
                 .value_name("ROTATIONS")
                 .help("Set number of log file rotations, defaults to 0")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("timerange-begin")
+                .short("b")
+                .long("begin")
+                .value_name("start time stamp in UTC seconds")
+                .help("Set optional start timestamp, defaults to 10 days before 'end'")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("timerange-end")
+                .short("e")
+                .long("end")
+                .value_name("stop time stamp in UTC seconds")
+                .help("Set optional end timestamp, defaults to now")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("maximum-gap")
+                .short("g")
+                .long("maxgap")
+                .value_name("maximum gap in milliseconds")
+                .help("Set optional maximum gap between log entries, defaults to 5 minutes")
                 .takes_value(true),
         )
         .get_matches()
